@@ -214,7 +214,9 @@ const utils = {
  * @throws Will throw an error if Puppeteer setup or navigation fails.
  */
 async function setupPuppeteerPageForCompanyDetails(url) {
-    const browser = await puppeteer.launch({
+    const browserPath = getBrowserExecutablePath();
+    
+    const launchOptions = {
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
@@ -223,7 +225,14 @@ async function setupPuppeteerPageForCompanyDetails(url) {
         ],
         timeout: 60000, // Browser launch timeout
         protocolTimeout: 120000 // CDP command timeout
-    });
+    };
+
+    // Only set executablePath if we found a specific browser
+    if (browserPath) {
+        launchOptions.executablePath = browserPath;
+    }
+    
+    const browser = await puppeteer.launch(launchOptions);
 
     try {
         const page = await browser.newPage();
@@ -266,57 +275,58 @@ function normalizeLinkedInUrl(url) {
         .replace(/\/(mycompany|about|overview)(\/)?$/, '') // remove '/mycompany', '/about', or '/overview'
         .replace(/\/+$/, ''); // remove trailing slashes
 }
-function getEdgeExecutablePath() {
+function getBrowserExecutablePath() {
     const platform = os.platform();
     
     // Check if we're in a production environment (like Render)
     const isProduction = process.env.NODE_ENV === 'production' || process.env.RENDER;
     
     if (isProduction) {
-        // For production environments (Render), Edge is not available, use Chrome/Chromium
-        console.log('[Browser] Production environment detected, using Chrome/Chromium instead of Edge');
-        const chromiumCandidates = {
-            linux: [
-                '/usr/bin/google-chrome-stable',
-                '/usr/bin/google-chrome',
-                '/usr/bin/chromium-browser',
-                '/usr/bin/chromium',
-                '/snap/bin/chromium'
-            ]
-        };
-        
-        const chromiumPaths = chromiumCandidates[platform] || [];
-        for (const chromePath of chromiumPaths) {
-            if (fs.existsSync(chromePath)) {
-                console.log(`[Browser] Using Chrome/Chromium: ${chromePath}`);
-                return chromePath;
-            }
-        }
-        
-        // If no Chrome/Chromium found, return null to use Puppeteer's bundled Chromium
-        console.log('[Browser] No Chrome/Chromium found, will use Puppeteer bundled Chromium');
-        return null;
+        // For production environments (Render), use Puppeteer's bundled Chromium
+        console.log('[Browser] Production environment detected, using Puppeteer bundled Chromium');
+        return null; // Let Puppeteer use its bundled Chromium
     }
     
-    // For local development, use Edge
-    const edgeCandidates = {
+    // For local development, try to find installed browsers
+    const browserCandidates = {
         win32: [
+            // Edge paths
             'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
-            'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe'
+            'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+            // Chrome paths
+            'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+            'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+            // User-specific Chrome paths
+            `${process.env.LOCALAPPDATA}\\Google\\Chrome\\Application\\chrome.exe`,
+            `${process.env.PROGRAMFILES}\\Google\\Chrome\\Application\\chrome.exe`,
+            `${process.env['PROGRAMFILES(X86)']}\\Google\\Chrome\\Application\\chrome.exe`
         ],
-        darwin: ['/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge'],
-        linux: ['/usr/bin/microsoft-edge', '/opt/microsoft/msedge/msedge']
+        darwin: [
+            '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
+            '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+        ],
+        linux: [
+            '/usr/bin/microsoft-edge',
+            '/opt/microsoft/msedge/msedge',
+            '/usr/bin/google-chrome-stable',
+            '/usr/bin/google-chrome',
+            '/usr/bin/chromium-browser',
+            '/usr/bin/chromium',
+            '/snap/bin/chromium'
+        ]
     };
 
-    const edgePaths = edgeCandidates[platform] || [];
-    for (const edgePath of edgePaths) {
-        if (fs.existsSync(edgePath)) {
-            console.log(`[Browser] Using Edge: ${edgePath}`);
-            return edgePath;
+    const paths = browserCandidates[platform] || [];
+    
+    for (const browserPath of paths) {
+        if (browserPath && fs.existsSync(browserPath)) {
+            console.log(`[Browser] Found local browser: ${browserPath}`);
+            return browserPath;
         }
     }
 
-    console.log('[Browser] Edge not found locally, will use Puppeteer bundled Chromium');
+    // If no local browser found, use Puppeteer's bundled Chromium
+    console.log('[Browser] No local browser found, will use Puppeteer bundled Chromium');
     return null;
 }
 /**
@@ -324,7 +334,7 @@ function getEdgeExecutablePath() {
  */
 //this is been used to fetch the data from linkedin
 async function extractCompanyDataFromLinkedIn(linkedinUrl) {
-    const browserPath = getEdgeExecutablePath();
+    const browserPath = getBrowserExecutablePath();
 
     const launchOptions = {
         headless: true,
@@ -346,14 +356,14 @@ async function extractCompanyDataFromLinkedIn(linkedinUrl) {
 
     const browser = await puppeteer.launch(launchOptions);
 
-    const context = await browser.createIncognitoBrowserContext();
+    const context = await browser.createBrowserContext();
     const page = await context.newPage();
 
     try {
         const cleanUrl = normalizeLinkedInUrl(linkedinUrl);
         await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36');
         await page.goto(cleanUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-        await page.waitForTimeout(4000);
+        // await page?.waitForTimeout(4000);
 
         // Try to close login pop-up if visible
         try {

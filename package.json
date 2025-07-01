@@ -1,19 +1,22 @@
 {
   "name": "sumNode",
   "version": "1.0.0",
-  "description": "",
+  "description": "Company details extraction API using Puppeteer",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node index.js"
+    "start": "node index.js",
+    "dev": "node index.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   },
   "keywords": [],
   "author": "srikar",
   "license": "ISC",
   "dependencies": {
     "cors": "^2.8.5",
-    "dns": "^0.2.2",
     "express": "^4.21.2",
-    "puppeteer": "^19.11.1"
+    "puppeteer": "^24.11.2"
   }
 }

@@ -470,8 +470,8 @@ async function extractCompanyDataFromLinkedIn(linkedinUrl) {
             '--disable-blink-features=AutomationControlled',
             '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         ],
-        timeout: 60000,
-        protocolTimeout: 120000
+        timeout: 90000,
+        protocolTimeout: 180000
     };
 
     // Only set executablePath if we found a specific browser
@@ -488,27 +488,90 @@ async function extractCompanyDataFromLinkedIn(linkedinUrl) {
     try {
         const cleanUrl = normalizeLinkedInUrl(linkedinUrl);
         
-        // Additional stealth measures for LinkedIn
-        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+        // Enhanced stealth measures for LinkedIn
+        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36');
         
-        // Remove webdriver property
+        // Enhanced anti-detection measures
         await page.evaluateOnNewDocument(() => {
+            // Remove webdriver property
             Object.defineProperty(navigator, 'webdriver', {
                 get: () => undefined,
             });
+          
+            // Override the plugins property to use a custom getter
+            Object.defineProperty(navigator, 'plugins', {
+                get: () => [1, 2, 3, 4, 5],
+            });
+            
+            // Override the languages property to use a custom getter
+            Object.defineProperty(navigator, 'languages', {
+                get: () => ['en-US', 'en'],
+            });
+            
+            // Override the permissions property
+            const originalQuery = window.navigator.permissions.query;
+            window.navigator.permissions.query = (parameters) => (
+                parameters.name === 'notifications' ?
+                    Promise.resolve({ state: Notification.permission }) :
+                    originalQuery(parameters)
+            );
         });
         
         // Set viewport to common resolution
         await page.setViewport({ width: 1366, height: 768 });
         
-        await page.goto(cleanUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-        // await page?.waitForTimeout(4000);
+        // Try navigation with retry logic
+        let navigationSuccess = false;
+        let lastError = null;
+        
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+                console.log(`[LinkedIn] Navigation attempt ${attempt}/3 to ${cleanUrl}`);
+                  await page.goto(cleanUrl, { 
+                    waitUntil: 'domcontentloaded', 
+                    timeout: 90000 
+                });
+                navigationSuccess = true;
+                console.log(`[LinkedIn] Navigation successful on attempt ${attempt}`);
+                break;
+            } catch (error) {
+                lastError = error;
+                console.log(`[LinkedIn] Navigation attempt ${attempt} failed:`, error.message);
+                
+                if (attempt < 3) {
+                    console.log(`[LinkedIn] Waiting 5 seconds before retry...`);
+                    await page.waitForTimeout(5000);
+                }
+            }
+        }
+        
+        if (!navigationSuccess) {
+            throw new Error(`LinkedIn navigation failed after 3 attempts. Last error: ${lastError.message}`);
+        }
+        
+        // Wait a bit for dynamic content to load with random delay
+        const randomDelay = 2000 + Math.random() * 3000; // 2-5 seconds
+        await page.waitForTimeout(randomDelay);
 
-        // Try to close login pop-up if visible
-        try {
-            await page.click('button[aria-label="Dismiss"]', { timeout: 2000 });
-            console.log('[LinkedIn] Dismissed login popup.');
-        } catch {}
+        // Try to close various popups that might appear
+        const popupSelectors = [
+            'button[aria-label="Dismiss"]',
+            'button[data-test-modal-close-btn]',
+            'button[class*="modal-close"]',
+            '.modal button[aria-label*="close"]',
+            '.artdeco-modal__dismiss'
+        ];
+        
+        for (const selector of popupSelectors) {
+            try {
+                await page.click(selector, { timeout: 2000 });
+                console.log(`[LinkedIn] Dismissed popup using selector: ${selector}`);
+                await page.waitForTimeout(1000); // Wait after dismissing
+                break;
+            } catch {
+                // Continue to next selector
+            }
+        }
 
         const data = await page.evaluate(() => {
             const getByLabel = (label) => {
@@ -642,9 +705,27 @@ const getImageFromBanner = () => {
         return data;
     } catch (err) {
         console.error('[LinkedIn Scrape Error]', err.message);
-        await context.close();
-        await browser.close();
-        return null;
+        
+        // Provide more specific error information
+        if (err.message.includes('Navigation timeout')) {
+            console.error('[LinkedIn] Navigation timeout - LinkedIn may be blocking requests or server is slow');
+        } else if (err.message.includes('net::ERR_')) {
+            console.error('[LinkedIn] Network error - connection issue or LinkedIn blocking');
+        } else if (err.message.includes('Protocol error')) {
+            console.error('[LinkedIn] Protocol error - browser communication issue');
+        }
+        
+        try {
+            await context.close();
+            await browser.close();
+        } catch (closeError) {
+            console.error('[LinkedIn] Error closing browser:', closeError.message);
+        }
+        
+        return { 
+            error: `LinkedIn scraping failed: ${err.message}`,
+            errorType: err.name || 'UnknownError'
+        };
     }
 }
 

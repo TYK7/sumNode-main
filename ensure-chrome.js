@@ -161,10 +161,17 @@ async function ensureChrome() {
  */
 function findChromeExecutable() {
     console.log('🔍 [Chrome Installer] Searching for Chrome executable...');
+    console.log('🔍 [Chrome Installer] Function called successfully');
     
     // First, let's explore the known cache directory
     const cacheDir = '/opt/render/.cache/puppeteer';
-    if (fs.existsSync(cacheDir)) {
+    console.log('🔍 [Chrome Installer] Checking if cache directory exists:', cacheDir);
+    
+    try {
+        const dirExists = fs.existsSync(cacheDir);
+        console.log('🔍 [Chrome Installer] Directory exists:', dirExists);
+        
+        if (dirExists) {
         console.log('🔍 [Chrome Installer] Exploring cache directory:', cacheDir);
         try {
             const contents = fs.readdirSync(cacheDir);
@@ -203,6 +210,9 @@ function findChromeExecutable() {
         } catch (error) {
             console.log('❌ [Chrome Installer] Error exploring cache directory:', error.message);
         }
+        } // Close the if (dirExists) block
+    } catch (error) {
+        console.log('❌ [Chrome Installer] Error checking cache directory:', error.message);
     }
     
     // Fallback to predefined paths

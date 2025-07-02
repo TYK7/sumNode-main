@@ -9,6 +9,7 @@ services:
       export PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=false &&
       npx puppeteer browsers install chrome &&
       node check-puppeteer.js &&
+      node test-find-chrome.js &&
       node test-chrome-fix.js
     startCommand: npm start
     envVars:

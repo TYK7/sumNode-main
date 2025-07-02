@@ -10,6 +10,7 @@
     "install-chrome": "node install-chrome.js",
     "ensure-chrome": "node ensure-chrome.js",
     "check-puppeteer": "node check-puppeteer.js",
+    "test-find-chrome": "node test-find-chrome.js",
     "test-chrome-fix": "node test-chrome-fix.js"
   },
   "engines": {

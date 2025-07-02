@@ -22,9 +22,12 @@ try {
     // Check various possible cache directories
     const possibleCacheDirs = [
         process.env.PUPPETEER_CACHE_DIR,
+        '/opt/render/.cache/puppeteer',
         '/opt/render/project/.cache/puppeteer',
         '/opt/render/project/node_modules/puppeteer/.local-chromium',
-        path.join(__dirname, 'node_modules', 'puppeteer', '.local-chromium')
+        path.join(__dirname, 'node_modules', 'puppeteer', '.local-chromium'),
+        path.join(process.env.HOME || '/opt/render', '.cache', 'puppeteer'),
+        '/tmp/.cache/puppeteer'
     ].filter(Boolean);
     
     console.log('📁 Checking possible cache directories...');
@@ -53,6 +56,22 @@ try {
                 args: ['--no-sandbox', '--disable-setuid-sandbox']
             });
             console.log('✅ Puppeteer launched successfully');
+            
+            // Try to get browser info
+            try {
+                const pages = await browser.pages();
+                const page = pages[0];
+                const browserVersion = await page.browser().version();
+                console.log('🌐 Browser version:', browserVersion);
+                
+                // Check if we can get executable path
+                if (browser.process && browser.process()) {
+                    console.log('📍 Chrome process PID:', browser.process().pid);
+                }
+            } catch (infoError) {
+                console.log('ℹ️  Browser info not available:', infoError.message);
+            }
+            
             await browser.close();
             console.log('✅ Browser closed successfully');
         } catch (error) {

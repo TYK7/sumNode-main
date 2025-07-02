@@ -5,6 +5,7 @@ const dns = require('dns').promises;
 const os = require('os');
 const fs = require('fs');
 const path = require('path');
+const { ensureChrome } = require('./ensure-chrome');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -41,10 +42,35 @@ app.get('/test-browser', (req, res) => {
   }
 });
 
-// ✅ Start the server (this is what Render needs)
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
-});
+// ✅ Start the server with Chrome initialization
+async function startServer() {
+  try {
+    // Ensure Chrome is available before starting the server
+    console.log('🚀 Initializing server...');
+    const chromeReady = await ensureChrome();
+    
+    if (!chromeReady) {
+      console.error('❌ Failed to initialize Chrome. Server may not work properly.');
+      // Continue anyway - some endpoints might still work
+    }
+    
+    app.listen(port, () => {
+      console.log(`Server running on port ${port}`);
+      if (chromeReady) {
+        console.log('✅ Chrome is ready for web scraping');
+      } else {
+        console.log('⚠️  Chrome initialization failed - web scraping may not work');
+      }
+    });
+    
+  } catch (error) {
+    console.error('💥 Server startup failed:', error);
+    process.exit(1);
+  }
+}
+
+// Start the server
+startServer();
 // Utility functions grouped into an object
 const utils = {
     /**
@@ -238,6 +264,8 @@ const utils = {
  * @throws Will throw an error if Puppeteer setup or navigation fails.
  */
 async function setupPuppeteerPageForCompanyDetails(url) {
+    // Chrome availability is ensured at server startup
+    
     const browserPath = getBrowserExecutablePath();
     
     const launchOptions = {
@@ -419,6 +447,8 @@ function getBrowserExecutablePathForLinkedIn() {
  */
 //this is been used to fetch the data from linkedin
 async function extractCompanyDataFromLinkedIn(linkedinUrl) {
+    // Chrome availability is ensured at server startup
+    
     const browserPath = getBrowserExecutablePathForLinkedIn();
 
     const launchOptions = {

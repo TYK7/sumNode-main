@@ -8,6 +8,7 @@
     "start": "node index.js",
     "dev": "node index.js",
     "install-chrome": "node install-chrome.js",
+    "ensure-chrome": "node ensure-chrome.js",
     "check-puppeteer": "node check-puppeteer.js"
   },
   "engines": {

@@ -6,7 +6,8 @@ services:
     buildCommand: |
       npm install &&
       npx puppeteer browsers install chrome &&
-      node check-puppeteer.js
+      node check-puppeteer.js &&
+      node test-chrome-fix.js
     startCommand: npm start
     envVars:
       - key: NODE_ENV
@@ -14,4 +15,4 @@ services:
       - key: PUPPETEER_SKIP_CHROMIUM_DOWNLOAD
         value: false
       - key: PUPPETEER_CACHE_DIR
-        value: /opt/render/project/.cache/puppeteer
+        value: /opt/render/.cache/puppeteer

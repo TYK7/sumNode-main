@@ -12,9 +12,36 @@ const path = require('path');
 async function ensureChrome() {
     console.log('🔧 [Chrome Installer] Starting Chrome availability check...');
     
+    // First, check if Chrome is already installed in the expected locations
+    const chromeExecutable = findChromeExecutable();
+    if (chromeExecutable) {
+        console.log('✅ [Chrome Installer] Found Chrome executable:', chromeExecutable);
+        
+        // Test the found executable
+        try {
+            const testBrowser = await puppeteer.launch({
+                headless: true,
+                executablePath: chromeExecutable,
+                args: ['--no-sandbox', '--disable-setuid-sandbox'],
+                timeout: 30000
+            });
+            
+            const version = await testBrowser.version();
+            console.log('✅ [Chrome Installer] Chrome is working:', version);
+            await testBrowser.close();
+            
+            // Store the working executable path for later use
+            process.env.CHROME_EXECUTABLE_PATH = chromeExecutable;
+            return true;
+            
+        } catch (error) {
+            console.log('❌ [Chrome Installer] Found Chrome but failed to launch:', error.message);
+        }
+    }
+    
     try {
-        // First, try to launch Puppeteer to see if Chrome is already available
-        console.log('🔍 [Chrome Installer] Testing Chrome availability...');
+        // Try to launch Puppeteer without specifying executable path
+        console.log('🔍 [Chrome Installer] Testing default Puppeteer Chrome...');
         const testBrowser = await puppeteer.launch({
             headless: true,
             args: ['--no-sandbox', '--disable-setuid-sandbox'],
@@ -22,12 +49,12 @@ async function ensureChrome() {
         });
         
         const version = await testBrowser.version();
-        console.log('✅ [Chrome Installer] Chrome is available:', version);
+        console.log('✅ [Chrome Installer] Default Chrome is available:', version);
         await testBrowser.close();
         return true;
         
     } catch (error) {
-        console.log('❌ [Chrome Installer] Chrome not available:', error.message);
+        console.log('❌ [Chrome Installer] Default Chrome not available:', error.message);
         console.log('📦 [Chrome Installer] Attempting to install Chrome...');
         
         try {
@@ -35,7 +62,7 @@ async function ensureChrome() {
             if (puppeteer.createBrowserFetcher) {
                 console.log('🌐 [Chrome Installer] Using browser fetcher...');
                 const browserFetcher = puppeteer.createBrowserFetcher({
-                    path: '/opt/render/.cache/puppeteer'
+                    path: process.env.PUPPETEER_CACHE_DIR || '/opt/render/.cache/puppeteer'
                 });
                 
                 const revisionInfo = await browserFetcher.download();
@@ -49,6 +76,9 @@ async function ensureChrome() {
                 });
                 await verifyBrowser.close();
                 console.log('✅ [Chrome Installer] Chrome installation verified');
+                
+                // Store the working executable path
+                process.env.CHROME_EXECUTABLE_PATH = revisionInfo.executablePath;
                 return true;
                 
             } else {
@@ -57,7 +87,9 @@ async function ensureChrome() {
                 
                 // Set environment to ensure download
                 process.env.PUPPETEER_SKIP_CHROMIUM_DOWNLOAD = 'false';
-                process.env.PUPPETEER_CACHE_DIR = '/opt/render/.cache/puppeteer';
+                if (!process.env.PUPPETEER_CACHE_DIR) {
+                    process.env.PUPPETEER_CACHE_DIR = '/opt/render/.cache/puppeteer';
+                }
                 
                 // Try to launch - this should trigger download
                 const browser = await puppeteer.launch({
@@ -97,6 +129,9 @@ async function ensureChrome() {
                         });
                         await browser.close();
                         console.log('✅ [Chrome Installer] System Chrome verified');
+                        
+                        // Store the working executable path
+                        process.env.CHROME_EXECUTABLE_PATH = chromePath;
                         return true;
                     } catch (testError) {
                         console.log('❌ [Chrome Installer] System Chrome test failed:', testError.message);
@@ -110,8 +145,54 @@ async function ensureChrome() {
     }
 }
 
+/**
+ * Find Chrome executable in common locations
+ */
+function findChromeExecutable() {
+    const possiblePaths = [
+        // Render-specific paths
+        '/opt/render/.cache/puppeteer/chrome/linux-127.0.6533.88/chrome-linux64/chrome',
+        '/opt/render/.cache/puppeteer/chrome/linux-*/chrome-linux64/chrome',
+        
+        // Generic cache paths
+        process.env.PUPPETEER_CACHE_DIR && path.join(process.env.PUPPETEER_CACHE_DIR, 'chrome/linux-*/chrome-linux64/chrome'),
+        
+        // System Chrome paths
+        '/usr/bin/google-chrome-stable',
+        '/usr/bin/google-chrome',
+        '/usr/bin/chromium-browser',
+        '/usr/bin/chromium'
+    ].filter(Boolean);
+    
+    for (const chromePath of possiblePaths) {
+        if (chromePath.includes('*')) {
+            // Handle wildcard paths
+            const baseDir = chromePath.split('*')[0];
+            if (fs.existsSync(baseDir)) {
+                try {
+                    const dirs = fs.readdirSync(baseDir);
+                    for (const dir of dirs) {
+                        const fullPath = path.join(baseDir, dir, 'chrome-linux64/chrome');
+                        if (fs.existsSync(fullPath)) {
+                            console.log('🔍 [Chrome Installer] Found Chrome at:', fullPath);
+                            return fullPath;
+                        }
+                    }
+                } catch (error) {
+                    // Continue to next path
+                }
+            }
+        } else if (fs.existsSync(chromePath)) {
+            console.log('🔍 [Chrome Installer] Found Chrome at:', chromePath);
+            return chromePath;
+        }
+    }
+    
+    return null;
+}
+
 // Export for use in other modules
-module.exports = { ensureChrome };
+module.exports = { ensureChrome, findChromeExecutable };
 
 // If run directly, execute the installer
 if (require.main === module) {

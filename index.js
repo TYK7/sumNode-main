@@ -297,12 +297,12 @@ async function setupPuppeteerPageForCompanyDetails(url) {
 
     try {
         const page = await browser.newPage();
-        page.setDefaultNavigationTimeout(90000); // Default navigation timeout
+        page.setDefaultNavigationTimeout(120000); // Default navigation timeout
         await page.setViewport({ width: 1280, height: 800 }); // Standard viewport
 
         const response = await page.goto(url, {
             waitUntil: 'networkidle2', // Wait for network activity to cease
-            timeout: 90000             // page.goto timeout
+            timeout: 120000             // page.goto timeout
         });
 
         if (!response) {
@@ -470,7 +470,7 @@ async function extractCompanyDataFromLinkedIn(linkedinUrl) {
             '--disable-blink-features=AutomationControlled',
             '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         ],
-        timeout: 90000,
+        timeout: 120000,
         protocolTimeout: 180000
     };
 
@@ -529,7 +529,7 @@ async function extractCompanyDataFromLinkedIn(linkedinUrl) {
                 console.log(`[LinkedIn] Navigation attempt ${attempt}/3 to ${cleanUrl}`);
                   await page.goto(cleanUrl, { 
                     waitUntil: 'domcontentloaded', 
-                    timeout: 90000 
+                    timeout: 120000 
                 });
                 navigationSuccess = true;
                 console.log(`[LinkedIn] Navigation successful on attempt ${attempt}`);

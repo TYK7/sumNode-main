@@ -468,7 +468,7 @@ async function extractCompanyDataFromLinkedIn(linkedinUrl) {
             '--disable-extensions',
             // LinkedIn-specific arguments to avoid detection
             '--disable-blink-features=AutomationControlled',
-            '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36'
         ],
         timeout: 90000,
         protocolTimeout: 180000
@@ -490,6 +490,16 @@ async function extractCompanyDataFromLinkedIn(linkedinUrl) {
         
         // Enhanced stealth measures for LinkedIn
         await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36');
+        
+        // Set additional headers to look more like a real browser
+        await page.setExtraHTTPHeaders({
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'DNT': '1',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+        });
         
         // Enhanced anti-detection measures
         await page.evaluateOnNewDocument(() => {
@@ -1451,7 +1461,15 @@ async function extractCompanyDetailsFromPage( page, url,browser) { // Added brow
                 const cleanUrl = normalizeLinkedInUrl(linkedInUrl);
                 // const linkedInData = await fetchLinkedInCompanyData(linkedInUrl); //jules
                 // const linkedInData = await extractCompanyDataFromLinkedIn(cleanUrl,browser); //gpt-1
-                const linkedInData = await extractCompanyDataFromLinkedIn(linkedInUrl);//gpt-2
+                
+                // Add timeout wrapper for LinkedIn scraping
+                console.log('[LinkedIn] Starting LinkedIn data extraction with 3-minute timeout...');
+                const linkedInData = await Promise.race([
+                    extractCompanyDataFromLinkedIn(linkedInUrl),
+                    new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error('LinkedIn extraction timeout after 3 minutes')), 180000)
+                    )
+                ]);
 
                 if (linkedInData && !linkedInData.error) {
                     console.log("[extractCompanyDetailsFromPage] Merging LinkedIn data:", linkedInData);

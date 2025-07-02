@@ -1,108 +1,43 @@
 #!/usr/bin/env node
 
 /**
- * Runtime Chrome installer for Render deployment
- * This ensures Chrome is available when the server starts
+ * Simple Chrome availability checker for Render deployment
+ * Uses Puppeteer's built-in browser management
  */
 
 const puppeteer = require('puppeteer');
-const fs = require('fs');
-const path = require('path');
 
 async function ensureChrome() {
-    console.log('🔧 [Chrome Installer] Starting Chrome availability check...');
+    console.log('🔧 [Chrome Installer] Checking Chrome availability...');
     
-    // Ensure environment variables are set for runtime
-    if (!process.env.PUPPETEER_CACHE_DIR) {
-        process.env.PUPPETEER_CACHE_DIR = '/opt/render/project/.cache/puppeteer';
-        console.log('🔧 [Chrome Installer] Set PUPPETEER_CACHE_DIR to:', process.env.PUPPETEER_CACHE_DIR);
-    }
-    
-    if (!process.env.PUPPETEER_SKIP_CHROMIUM_DOWNLOAD) {
-        process.env.PUPPETEER_SKIP_CHROMIUM_DOWNLOAD = 'false';
-        console.log('🔧 [Chrome Installer] Set PUPPETEER_SKIP_CHROMIUM_DOWNLOAD to:', process.env.PUPPETEER_SKIP_CHROMIUM_DOWNLOAD);
-    }
-    
-    // Strategy 1: Try to launch Puppeteer with default settings first
-    console.log('🔍 [Chrome Installer] Strategy 1: Testing default Puppeteer launch...');
     try {
-        const testBrowser = await puppeteer.launch({
+        // Simply try to launch Puppeteer - it will handle Chrome installation automatically
+        const browser = await puppeteer.launch({
             headless: true,
-            args: ['--no-sandbox', '--disable-setuid-sandbox'],
-            timeout: 30000
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-accelerated-2d-canvas',
+                '--no-first-run',
+                '--no-zygote',
+                '--single-process',
+                '--disable-gpu'
+            ],
+            timeout: 60000 // Give time for potential download
         });
         
-        const version = await testBrowser.version();
-        console.log('✅ [Chrome Installer] Default Puppeteer Chrome working:', version);
-        await testBrowser.close();
+        const version = await browser.version();
+        console.log('✅ [Chrome Installer] Chrome is working:', version);
+        await browser.close();
+        
+        console.log('✅ Chrome is ready for web scraping');
         return true;
         
     } catch (error) {
-        console.log('❌ [Chrome Installer] Default Puppeteer launch failed:', error.message);
+        console.log('❌ [Chrome Installer] Chrome setup failed:', error.message);
+        return false;
     }
-    
-    // Strategy 2: Try to find and use a specific Chrome executable
-    console.log('🔍 [Chrome Installer] Strategy 2: Looking for specific Chrome executable...');
-    const chromeExecutable = findChromeExecutable();
-    if (chromeExecutable) {
-        console.log('✅ [Chrome Installer] Found Chrome executable:', chromeExecutable);
-        
-        // Test the found executable
-        try {
-            const testBrowser = await puppeteer.launch({
-                headless: true,
-                executablePath: chromeExecutable,
-                args: ['--no-sandbox', '--disable-setuid-sandbox'],
-                timeout: 30000
-            });
-            
-            const version = await testBrowser.version();
-            console.log('✅ [Chrome Installer] Chrome is working:', version);
-            await testBrowser.close();
-            
-            // Store the working executable path for later use
-            process.env.CHROME_EXECUTABLE_PATH = chromeExecutable;
-            return true;
-            
-        } catch (error) {
-            console.log('❌ [Chrome Installer] Found Chrome but failed to launch:', error.message);
-        }
-    }
-    
-    // Strategy 3: Check for system Chrome as fallback
-    console.log('🔍 [Chrome Installer] Strategy 3: Checking for system Chrome...');
-    const systemPaths = [
-        '/usr/bin/google-chrome-stable',
-        '/usr/bin/google-chrome',
-        '/usr/bin/chromium-browser',
-        '/usr/bin/chromium'
-    ];
-    
-    for (const chromePath of systemPaths) {
-        if (fs.existsSync(chromePath)) {
-            console.log('✅ [Chrome Installer] Found system Chrome:', chromePath);
-            
-            // Test system Chrome
-            try {
-                const browser = await puppeteer.launch({
-                    headless: true,
-                    executablePath: chromePath,
-                    args: ['--no-sandbox', '--disable-setuid-sandbox']
-                });
-                await browser.close();
-                console.log('✅ [Chrome Installer] System Chrome verified');
-                
-                // Store the working executable path
-                process.env.CHROME_EXECUTABLE_PATH = chromePath;
-                return true;
-            } catch (testError) {
-                console.log('❌ [Chrome Installer] System Chrome test failed:', testError.message);
-            }
-        }
-    }
-    
-    console.log('❌ [Chrome Installer] All strategies failed');
-    return false;
 }
 
 /**
@@ -211,7 +146,7 @@ function findChromeExecutable() {
 }
 
 // Export for use in other modules
-module.exports = { ensureChrome, findChromeExecutable };
+module.exports = { ensureChrome };
 
 // If run directly, execute the installer
 if (require.main === module) {

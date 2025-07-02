@@ -343,13 +343,7 @@ function getBrowserExecutablePath() {
     const isProduction = process.env.NODE_ENV === 'production' || process.env.RENDER;
     
     if (isProduction) {
-        // If Chrome was found during initialization, use that path
-        if (process.env.CHROME_EXECUTABLE_PATH) {
-            console.log('[Browser] Using Chrome path from initialization:', process.env.CHROME_EXECUTABLE_PATH);
-            return process.env.CHROME_EXECUTABLE_PATH;
-        }
-        
-        // For production environments (Render), use Puppeteer's bundled Chromium
+        // For production environments (Render), let Puppeteer handle browser detection automatically
         console.log('[Browser] Production environment detected, using Puppeteer bundled Chromium');
         return null; // Let Puppeteer handle browser detection automatically
     }
@@ -405,12 +399,6 @@ function getBrowserExecutablePathForLinkedIn() {
     const isProduction = process.env.NODE_ENV === 'production' || process.env.RENDER;
     
     if (isProduction) {
-        // If Chrome was found during initialization, use that path
-        if (process.env.CHROME_EXECUTABLE_PATH) {
-            console.log('[LinkedIn Browser] Using Chrome path from initialization:', process.env.CHROME_EXECUTABLE_PATH);
-            return process.env.CHROME_EXECUTABLE_PATH;
-        }
-        
         // In production (Render), use Puppeteer's bundled Chromium for LinkedIn
         console.log('[LinkedIn Browser] Production environment detected, using Puppeteer bundled Chromium');
         return null; // Let Puppeteer handle browser detection automatically

@@ -297,7 +297,7 @@ async function setupPuppeteerPageForCompanyDetails(url) {
 
     try {
         const page = await browser.newPage();
-        page.setDefaultNavigationTimeout(120000); // Default navigation timeout
+        page.setDefaultNavigationTimeout(90000); // Default navigation timeout
         await page.setViewport({ width: 1280, height: 800 }); // Standard viewport
 
         const response = await page.goto(url, {
@@ -470,7 +470,7 @@ async function extractCompanyDataFromLinkedIn(linkedinUrl) {
             '--disable-blink-features=AutomationControlled',
             '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         ],
-        timeout: 120000,
+        timeout: 90000,
         protocolTimeout: 180000
     };
 

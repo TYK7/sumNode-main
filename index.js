@@ -283,13 +283,13 @@ async function setupPuppeteerPageForCompanyDetails(url) {
             '--no-default-browser-check',
             '--disable-extensions',
             // Performance optimizations for Render
-            '--memory-pressure-off',
-            '--max_old_space_size=4096',
-            '--no-zygote',
-            '--single-process',
-            '--disable-background-networking',
-            '--disable-default-apps',
-            '--disable-sync'
+            // '--memory-pressure-off',
+            // '--max_old_space_size=4096',
+            // '--no-zygote',
+            // '--single-process',
+            // '--disable-background-networking',
+            // '--disable-default-apps',
+            // '--disable-sync'
         ],
         headless: true,
         timeout: 120000, // Browser launch timeout (2 minutes)

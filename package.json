@@ -8,7 +8,8 @@
     "start": "node index.js",
     "dev": "node index.js",
     "install-chrome": "npx puppeteer browsers install chrome",
-    "check-puppeteer": "node check-puppeteer.js"
+    "check-puppeteer": "node check-puppeteer.js",
+    "postinstall": "npx puppeteer browsers install chrome"
   },
   "engines": {
     "node": ">=18.0.0"

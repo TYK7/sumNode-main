@@ -11,8 +11,15 @@ async function testChromeFix() {
     console.log('🧪 Testing Chrome installation fix...');
     console.log('');
     
-    // Test 1: Check if Chrome executable can be found
-    console.log('Test 1: Finding Chrome executable...');
+    // Test 1: Check environment variables
+    console.log('Test 1: Environment variables...');
+    console.log('   PUPPETEER_CACHE_DIR:', process.env.PUPPETEER_CACHE_DIR);
+    console.log('   PUPPETEER_SKIP_CHROMIUM_DOWNLOAD:', process.env.PUPPETEER_SKIP_CHROMIUM_DOWNLOAD);
+    console.log('   NODE_ENV:', process.env.NODE_ENV);
+    console.log('');
+    
+    // Test 2: Check if Chrome executable can be found
+    console.log('Test 2: Finding Chrome executable...');
     const chromeExecutable = findChromeExecutable();
     if (chromeExecutable) {
         console.log('✅ Chrome executable found:', chromeExecutable);
@@ -21,8 +28,8 @@ async function testChromeFix() {
     }
     console.log('');
     
-    // Test 2: Run ensureChrome function
-    console.log('Test 2: Running ensureChrome...');
+    // Test 3: Run ensureChrome function
+    console.log('Test 3: Running ensureChrome...');
     const chromeReady = await ensureChrome();
     if (chromeReady) {
         console.log('✅ ensureChrome succeeded');
@@ -31,8 +38,8 @@ async function testChromeFix() {
     }
     console.log('');
     
-    // Test 3: Try to launch Puppeteer with the found executable
-    console.log('Test 3: Testing Puppeteer launch...');
+    // Test 4: Try to launch Puppeteer with the found executable
+    console.log('Test 4: Testing Puppeteer launch...');
     try {
         const launchOptions = {
             headless: true,

@@ -12,6 +12,17 @@ const path = require('path');
 async function ensureChrome() {
     console.log('🔧 [Chrome Installer] Starting Chrome availability check...');
     
+    // Ensure environment variables are set for runtime
+    if (!process.env.PUPPETEER_CACHE_DIR) {
+        process.env.PUPPETEER_CACHE_DIR = '/opt/render/.cache/puppeteer';
+        console.log('🔧 [Chrome Installer] Set PUPPETEER_CACHE_DIR to:', process.env.PUPPETEER_CACHE_DIR);
+    }
+    
+    if (!process.env.PUPPETEER_SKIP_CHROMIUM_DOWNLOAD) {
+        process.env.PUPPETEER_SKIP_CHROMIUM_DOWNLOAD = 'false';
+        console.log('🔧 [Chrome Installer] Set PUPPETEER_SKIP_CHROMIUM_DOWNLOAD to:', process.env.PUPPETEER_SKIP_CHROMIUM_DOWNLOAD);
+    }
+    
     // First, check if Chrome is already installed in the expected locations
     const chromeExecutable = findChromeExecutable();
     if (chromeExecutable) {
@@ -149,13 +160,60 @@ async function ensureChrome() {
  * Find Chrome executable in common locations
  */
 function findChromeExecutable() {
+    console.log('🔍 [Chrome Installer] Searching for Chrome executable...');
+    
+    // First, let's explore the known cache directory
+    const cacheDir = '/opt/render/.cache/puppeteer';
+    if (fs.existsSync(cacheDir)) {
+        console.log('🔍 [Chrome Installer] Exploring cache directory:', cacheDir);
+        try {
+            const contents = fs.readdirSync(cacheDir);
+            console.log('🔍 [Chrome Installer] Cache contents:', contents.join(', '));
+            
+            // Look for chrome directory
+            if (contents.includes('chrome')) {
+                const chromeDir = path.join(cacheDir, 'chrome');
+                console.log('🔍 [Chrome Installer] Exploring chrome directory:', chromeDir);
+                
+                const chromeContents = fs.readdirSync(chromeDir);
+                console.log('🔍 [Chrome Installer] Chrome directory contents:', chromeContents.join(', '));
+                
+                // Look for version directories
+                for (const versionDir of chromeContents) {
+                    const versionPath = path.join(chromeDir, versionDir);
+                    if (fs.statSync(versionPath).isDirectory()) {
+                        console.log('🔍 [Chrome Installer] Checking version directory:', versionPath);
+                        
+                        // Try different possible executable paths
+                        const possibleExePaths = [
+                            path.join(versionPath, 'chrome-linux64', 'chrome'),
+                            path.join(versionPath, 'chrome-linux', 'chrome'),
+                            path.join(versionPath, 'chrome'),
+                        ];
+                        
+                        for (const exePath of possibleExePaths) {
+                            if (fs.existsSync(exePath)) {
+                                console.log('✅ [Chrome Installer] Found Chrome executable:', exePath);
+                                return exePath;
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            console.log('❌ [Chrome Installer] Error exploring cache directory:', error.message);
+        }
+    }
+    
+    // Fallback to predefined paths
     const possiblePaths = [
         // Render-specific paths
         '/opt/render/.cache/puppeteer/chrome/linux-127.0.6533.88/chrome-linux64/chrome',
-        '/opt/render/.cache/puppeteer/chrome/linux-*/chrome-linux64/chrome',
+        '/opt/render/.cache/puppeteer/chrome/linux-127.0.6533.88/chrome-linux/chrome',
         
-        // Generic cache paths
-        process.env.PUPPETEER_CACHE_DIR && path.join(process.env.PUPPETEER_CACHE_DIR, 'chrome/linux-*/chrome-linux64/chrome'),
+        // Generic cache paths with environment variable
+        process.env.PUPPETEER_CACHE_DIR && path.join(process.env.PUPPETEER_CACHE_DIR, 'chrome/linux-127.0.6533.88/chrome-linux64/chrome'),
+        process.env.PUPPETEER_CACHE_DIR && path.join(process.env.PUPPETEER_CACHE_DIR, 'chrome/linux-127.0.6533.88/chrome-linux/chrome'),
         
         // System Chrome paths
         '/usr/bin/google-chrome-stable',
@@ -164,30 +222,16 @@ function findChromeExecutable() {
         '/usr/bin/chromium'
     ].filter(Boolean);
     
+    console.log('🔍 [Chrome Installer] Checking predefined paths...');
     for (const chromePath of possiblePaths) {
-        if (chromePath.includes('*')) {
-            // Handle wildcard paths
-            const baseDir = chromePath.split('*')[0];
-            if (fs.existsSync(baseDir)) {
-                try {
-                    const dirs = fs.readdirSync(baseDir);
-                    for (const dir of dirs) {
-                        const fullPath = path.join(baseDir, dir, 'chrome-linux64/chrome');
-                        if (fs.existsSync(fullPath)) {
-                            console.log('🔍 [Chrome Installer] Found Chrome at:', fullPath);
-                            return fullPath;
-                        }
-                    }
-                } catch (error) {
-                    // Continue to next path
-                }
-            }
-        } else if (fs.existsSync(chromePath)) {
-            console.log('🔍 [Chrome Installer] Found Chrome at:', chromePath);
+        console.log('🔍 [Chrome Installer] Checking:', chromePath);
+        if (fs.existsSync(chromePath)) {
+            console.log('✅ [Chrome Installer] Found Chrome at:', chromePath);
             return chromePath;
         }
     }
     
+    console.log('❌ [Chrome Installer] No Chrome executable found');
     return null;
 }
 

@@ -315,44 +315,9 @@ function getBrowserExecutablePath() {
     const isProduction = process.env.NODE_ENV === 'production' || process.env.RENDER;
     
     if (isProduction) {
-        // For production environments (Render), try to use the installed Chrome first
-        console.log('[Browser] Production environment detected');
-        
-        // Check if Chrome was installed via puppeteer browsers install
-        const puppeteerCachePath = process.env.PUPPETEER_CACHE_DIR || '/opt/render/.cache/puppeteer';
-        
-        // Try to find the installed Chrome in the cache directory
-        
-        try {
-            // Look for Chrome in the Puppeteer cache
-            if (fs.existsSync(puppeteerCachePath)) {
-                const chromeDir = path.join(puppeteerCachePath, 'chrome');
-                if (fs.existsSync(chromeDir)) {
-                    // Find the Chrome executable in the cache
-                    const chromeDirs = fs.readdirSync(chromeDir);
-                    for (const dir of chromeDirs) {
-                        const chromePath = path.join(chromeDir, dir, 'chrome-linux64', 'chrome');
-                        if (fs.existsSync(chromePath)) {
-                            console.log(`[Browser] Found Puppeteer installed Chrome: ${chromePath}`);
-                            return chromePath;
-                        }
-                    }
-                }
-            }
-        } catch (error) {
-            console.log('[Browser] Error checking Puppeteer cache:', error.message);
-        }
-        
-        // Fallback to system Chrome if available
-        const systemChrome = '/usr/bin/google-chrome-stable';
-        if (fs.existsSync(systemChrome)) {
-            console.log(`[Browser] Using system Chrome: ${systemChrome}`);
-            return systemChrome;
-        }
-        
-        // Last resort: use Puppeteer's bundled Chromium
-        console.log('[Browser] Using Puppeteer bundled Chromium');
-        return null;
+        // For production environments (Render), use Puppeteer's bundled Chromium
+        console.log('[Browser] Production environment detected, using Puppeteer bundled Chromium');
+        return null; // Let Puppeteer use its bundled Chromium
     }
     
     // For local development, try to find installed browsers
@@ -406,9 +371,9 @@ function getBrowserExecutablePathForLinkedIn() {
     const isProduction = process.env.NODE_ENV === 'production' || process.env.RENDER;
     
     if (isProduction) {
-        // In production (Render), use Chrome since Edge is not easily available
-        console.log('[LinkedIn Browser] Production environment detected, using Chrome for LinkedIn');
-        return getBrowserExecutablePath(); // This will return Chrome path in production
+        // In production (Render), use Puppeteer's bundled Chromium for LinkedIn
+        console.log('[LinkedIn Browser] Production environment detected, using Puppeteer bundled Chromium for LinkedIn');
+        return null; // Let Puppeteer use its bundled Chromium
     }
     
     // For local development, prefer Edge for LinkedIn

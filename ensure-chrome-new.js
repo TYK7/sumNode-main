@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 /**
- * Runtime Chrome installer for Render deployment
- * This ensures Chrome is available when the server starts
+ * Chrome installer and availability checker for Render deployment
+ * This module ensures Chrome is available for Puppeteer to use
  */
 
 const puppeteer = require('puppeteer');
@@ -173,6 +173,8 @@ function findChromeExecutable() {
         // Render-specific paths
         '/opt/render/project/.cache/puppeteer/chrome/linux-127.0.6533.88/chrome-linux64/chrome',
         '/opt/render/project/.cache/puppeteer/chrome/linux-127.0.6533.88/chrome-linux/chrome',
+        '/opt/render/.cache/puppeteer/chrome/linux-127.0.6533.88/chrome-linux64/chrome',
+        '/opt/render/.cache/puppeteer/chrome/linux-127.0.6533.88/chrome-linux/chrome',
         
         // Generic cache paths with environment variable
         process.env.PUPPETEER_CACHE_DIR && path.join(process.env.PUPPETEER_CACHE_DIR, 'chrome/linux-127.0.6533.88/chrome-linux64/chrome'),
@@ -215,18 +217,16 @@ module.exports = { ensureChrome, findChromeExecutable };
 
 // If run directly, execute the installer
 if (require.main === module) {
-    ensureChrome()
-        .then(success => {
-            if (success) {
-                console.log('🎉 [Chrome Installer] Chrome is ready!');
-                process.exit(0);
-            } else {
-                console.log('💥 [Chrome Installer] Chrome installation failed!');
-                process.exit(1);
-            }
-        })
-        .catch(error => {
-            console.error('💥 [Chrome Installer] Unexpected error:', error);
+    ensureChrome().then(success => {
+        if (success) {
+            console.log('🎉 Chrome is ready!');
+            process.exit(0);
+        } else {
+            console.log('💥 Chrome setup failed!');
             process.exit(1);
-        });
+        }
+    }).catch(error => {
+        console.error('💥 Chrome installer error:', error);
+        process.exit(1);
+    });
 }

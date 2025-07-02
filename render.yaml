@@ -5,8 +5,9 @@ services:
     plan: free
     buildCommand: |
       npm install &&
-      export PUPPETEER_CACHE_DIR=/opt/render/.cache/puppeteer &&
+      export PUPPETEER_CACHE_DIR=/opt/render/project/.cache/puppeteer &&
       export PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=false &&
+      mkdir -p /opt/render/project/.cache/puppeteer &&
       npx puppeteer browsers install chrome &&
       node check-puppeteer.js &&
       node test-find-chrome.js &&
@@ -18,4 +19,4 @@ services:
       - key: PUPPETEER_SKIP_CHROMIUM_DOWNLOAD
         value: false
       - key: PUPPETEER_CACHE_DIR
-        value: /opt/render/.cache/puppeteer
+        value: /opt/render/project/.cache/puppeteer

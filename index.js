@@ -328,23 +328,99 @@ async function setupPuppeteerPageForCompanyDetails(url) {
 
     try {
         const page = await browser.newPage();
-        page.setDefaultNavigationTimeout(90000); // Default navigation timeout
+        page.setDefaultNavigationTimeout(180000); // Default navigation timeout (3 minutes)
         await page.setViewport({ width: 1280, height: 800 }); // Standard viewport
-
-        const response = await page.goto(url, {
-            waitUntil: 'networkidle2', // Wait for network activity to cease
-            timeout: 120000             // page.goto timeout
+        
+      // Optimize page loading by blocking some unnecessary resources
+        await page.setRequestInterception(true);
+        page.on('request', (req) => {
+            const resourceType = req.resourceType();
+            const url = req.url();
+            
+            // Block heavy media and some fonts, but keep essential resources
+            if (resourceType === 'media' || 
+                (resourceType === 'font' && !url.includes('woff')) ||
+                url.includes('analytics') ||
+                url.includes('tracking') ||
+                url.includes('ads')) {
+                req.abort();
+            } else {
+                req.continue();
+            }
         });
 
+        // Navigation with retry logic and progressive wait conditions
+        let response;
+        let navigationSuccess = false;
+        let lastError;
+        
+        const waitConditions = [
+            'domcontentloaded',  // Fastest - just wait for DOM
+            'load',              // Medium - wait for all resources
+            'networkidle0'       // Slowest - wait for network to be idle
+        ];
+        
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            for (let conditionIndex = 0; conditionIndex < waitConditions.length; conditionIndex++) {
+                const waitCondition = waitConditions[conditionIndex];
+                  const timeout = 60000 + (conditionIndex * 30000); // 60s, 90s, 120s
+                
+                try {
+                    console.log(`[Navigation] Attempt ${attempt}/3 with '${waitCondition}' (${timeout/1000}s timeout) for ${url}`);
+                    
+                    response = await page.goto(url, {
+                        waitUntil: waitCondition,
+                        timeout: timeout
+                    });
+                    
+                    navigationSuccess = true;
+                    console.log(`[Navigation] Success with '${waitCondition}' on attempt ${attempt}`);
+                    break;
+                } catch (error) {
+                    lastError = error;
+                    console.log(`[Navigation] Failed with '${waitCondition}':`, error.message);
+                    
+                    // If this was the last condition, break to try next attempt
+                    if (conditionIndex === waitConditions.length - 1) {
+                        break;
+                    }
+                }
+            }
+            
+            if (navigationSuccess) break;
+            
+            if (attempt < 3) {
+                console.log(`[Navigation] Waiting 5 seconds before retry...`);
+                await new Promise(resolve => setTimeout(resolve, 5000));
+            }
+        }
+        
+        if (!navigationSuccess) {
+            // Final fallback attempt with minimal requirements
+            console.log(`[Navigation] Final fallback attempt with minimal timeout...`);
+            try {
+                response = await page.goto(url, {
+                    waitUntil: 'domcontentloaded',
+                    timeout: 30000 // Just 30 seconds
+                });
+                navigationSuccess = true;
+                console.log(`[Navigation] Fallback attempt succeeded`);
+            } catch (fallbackError) {
+                throw new Error(`Navigation failed completely. Last error: ${lastError.message}, Fallback error: ${fallbackError.message}`);
+            }
+        }
+
         if (!response) {
-            // This case is unlikely if page.goto resolves, but good for robustness
             throw new Error('Failed to load the page: No response received.');
         }
 
         if (!response.ok()) {
-            // Capture non-2xx HTTP status codes
-            throw new Error(`HTTP error! status: ${response.status()} for URL: ${url}`);
+            console.warn(`[Navigation] HTTP ${response.status()} for ${url}, but continuing...`);
+            // Don't throw error for non-2xx status codes, many sites work despite this
         }
+        
+        // Give the page a moment to settle after navigation
+        await new Promise(resolve => setTimeout(resolve, 2000));
         return { browser, page };
     } catch (error) {
         if (browser) {
@@ -1562,7 +1638,14 @@ app.post('/api/extract-company-details', async (req, res) => {
         const { browser: launchedBrowser, page } = await setupPuppeteerPageForCompanyDetails(url);
         browser = launchedBrowser;
 
-        const companyDetails = await extractCompanyDetailsFromPage(page, url,browser);
+        // Add timeout wrapper for the entire extraction process
+        console.log('[Extraction] Starting company details extraction with 10-minute timeout...');
+        const companyDetails = await Promise.race([
+            extractCompanyDetailsFromPage(page, url, browser),
+            new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Company extraction timeout after 10 minutes')), 600000)
+            )
+        ]);
 
         res.status(200).json(companyDetails);
 

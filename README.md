@@ -37,6 +37,23 @@ Extracts company details from a given URL.
 
 Simple health check endpoint.
 
+### GET /test-browser
+
+Browser detection test endpoint. Returns information about detected browsers and environment.
+
+**Response:**
+```json
+{
+  "success": true,
+  "environment": "production",
+  "isRender": true,
+  "generalBrowser": "/path/to/chrome",
+  "linkedinBrowser": "/path/to/chrome",
+  "platform": "linux",
+  "puppeteerCacheDir": "/opt/render/.cache/puppeteer"
+}
+```
+
 ## Local Development
 
 1. Install dependencies:
@@ -73,10 +90,26 @@ The `render.yaml` file is included for automatic configuration.
 
 ## Browser Configuration
 
-The application automatically detects available browsers:
+The application uses intelligent browser detection with different strategies:
 
-- **Local Development:** Uses installed Edge or Chrome
-- **Production (Render):** Uses Puppeteer's bundled Chromium
+### General Company Extraction:
+- **Local Development:** Tries Edge → Chrome → Puppeteer bundled Chromium
+- **Production (Render):** Uses Chrome installed via `npx puppeteer browsers install chrome`
+
+### LinkedIn Extraction:
+- **Local Development:** Prefers Edge (better for LinkedIn) → Chrome → Puppeteer bundled Chromium  
+- **Production (Render):** Uses Chrome (Edge not available in Linux containers)
+
+### Additional Features:
+- Automatic Chrome installation during Render deployment
+- Stealth measures for LinkedIn scraping (custom user agent, webdriver property removal)
+- Container-optimized Chrome flags for production environments
+
+### Test Browser Detection:
+Use the `/test-browser` endpoint to verify browser detection:
+```bash
+curl https://your-app.onrender.com/test-browser
+```
 
 ## Dependencies
 

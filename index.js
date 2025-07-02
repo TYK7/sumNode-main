@@ -4,6 +4,7 @@ const puppeteer = require('puppeteer');
 const dns = require('dns').promises;
 const os = require('os');
 const fs = require('fs');
+const path = require('path');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -15,6 +16,29 @@ app.use(express.json());
 // ✅ Example test endpoint
 app.get('/test', (req, res) => {
   res.send('test completed');
+});
+
+// ✅ Browser detection test endpoint
+app.get('/test-browser', (req, res) => {
+  try {
+    const generalBrowserPath = getBrowserExecutablePath();
+    const linkedinBrowserPath = getBrowserExecutablePathForLinkedIn();
+    
+    res.json({
+      success: true,
+      environment: process.env.NODE_ENV || 'development',
+      isRender: !!process.env.RENDER,
+      generalBrowser: generalBrowserPath || 'Puppeteer bundled Chromium',
+      linkedinBrowser: linkedinBrowserPath || 'Puppeteer bundled Chromium',
+      platform: os.platform(),
+      puppeteerCacheDir: process.env.PUPPETEER_CACHE_DIR || 'default'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
 });
 
 // ✅ Start the server (this is what Render needs)
@@ -221,8 +245,17 @@ async function setupPuppeteerPageForCompanyDetails(url) {
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-web-security',
-            '--disable-features=IsolateOrigins,site-per-process'
+            '--disable-features=IsolateOrigins,site-per-process',
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--disable-background-timer-throttling',
+            '--disable-backgrounding-occluded-windows',
+            '--disable-renderer-backgrounding',
+            '--no-first-run',
+            '--no-default-browser-check',
+            '--disable-extensions'
         ],
+        headless: true,
         timeout: 60000, // Browser launch timeout
         protocolTimeout: 120000 // CDP command timeout
     };
@@ -282,9 +315,44 @@ function getBrowserExecutablePath() {
     const isProduction = process.env.NODE_ENV === 'production' || process.env.RENDER;
     
     if (isProduction) {
-        // For production environments (Render), use Puppeteer's bundled Chromium
-        console.log('[Browser] Production environment detected, using Puppeteer bundled Chromium');
-        return null; // Let Puppeteer use its bundled Chromium
+        // For production environments (Render), try to use the installed Chrome first
+        console.log('[Browser] Production environment detected');
+        
+        // Check if Chrome was installed via puppeteer browsers install
+        const puppeteerCachePath = process.env.PUPPETEER_CACHE_DIR || '/opt/render/.cache/puppeteer';
+        
+        // Try to find the installed Chrome in the cache directory
+        
+        try {
+            // Look for Chrome in the Puppeteer cache
+            if (fs.existsSync(puppeteerCachePath)) {
+                const chromeDir = path.join(puppeteerCachePath, 'chrome');
+                if (fs.existsSync(chromeDir)) {
+                    // Find the Chrome executable in the cache
+                    const chromeDirs = fs.readdirSync(chromeDir);
+                    for (const dir of chromeDirs) {
+                        const chromePath = path.join(chromeDir, dir, 'chrome-linux64', 'chrome');
+                        if (fs.existsSync(chromePath)) {
+                            console.log(`[Browser] Found Puppeteer installed Chrome: ${chromePath}`);
+                            return chromePath;
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            console.log('[Browser] Error checking Puppeteer cache:', error.message);
+        }
+        
+        // Fallback to system Chrome if available
+        const systemChrome = '/usr/bin/google-chrome-stable';
+        if (fs.existsSync(systemChrome)) {
+            console.log(`[Browser] Using system Chrome: ${systemChrome}`);
+            return systemChrome;
+        }
+        
+        // Last resort: use Puppeteer's bundled Chromium
+        console.log('[Browser] Using Puppeteer bundled Chromium');
+        return null;
     }
     
     // For local development, try to find installed browsers
@@ -330,22 +398,85 @@ function getBrowserExecutablePath() {
     return null;
 }
 /**
- * Use Edge to scrape company details from a LinkedIn company page
+ * Get browser executable path specifically for LinkedIn extraction
+ * Prefers Edge for local development, Chrome for production
+ */
+function getBrowserExecutablePathForLinkedIn() {
+    const platform = os.platform();
+    const isProduction = process.env.NODE_ENV === 'production' || process.env.RENDER;
+    
+    if (isProduction) {
+        // In production (Render), use Chrome since Edge is not easily available
+        console.log('[LinkedIn Browser] Production environment detected, using Chrome for LinkedIn');
+        return getBrowserExecutablePath(); // This will return Chrome path in production
+    }
+    
+    // For local development, prefer Edge for LinkedIn
+    const browserCandidates = {
+        win32: [
+            // Edge paths (preferred for LinkedIn)
+            'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+            'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+            // Chrome paths (fallback)
+            'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+            'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+            `${process.env.LOCALAPPDATA}\\Google\\Chrome\\Application\\chrome.exe`,
+        ],
+        darwin: [
+            '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
+            '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+        ],
+        linux: [
+            '/usr/bin/microsoft-edge',
+            '/opt/microsoft/msedge/msedge',
+            '/usr/bin/google-chrome-stable',
+            '/usr/bin/google-chrome',
+            '/usr/bin/chromium-browser',
+            '/usr/bin/chromium'
+        ]
+    };
+
+    const paths = browserCandidates[platform] || [];
+    
+    for (const browserPath of paths) {
+        if (browserPath && fs.existsSync(browserPath)) {
+            console.log(`[LinkedIn Browser] Found browser for LinkedIn: ${browserPath}`);
+            return browserPath;
+        }
+    }
+
+    console.log('[LinkedIn Browser] No specific browser found, using default');
+    return null;
+}
+
+/**
+ * Use Edge (local) or Chrome (production) to scrape company details from a LinkedIn company page
  */
 //this is been used to fetch the data from linkedin
 async function extractCompanyDataFromLinkedIn(linkedinUrl) {
-    const browserPath = getBrowserExecutablePath();
+    const browserPath = getBrowserExecutablePathForLinkedIn();
 
     const launchOptions = {
         headless: true,
         args: [
-            '--headless=new',
-            '--disable-gpu',
             '--no-sandbox',
-            '--disable-dev-shm-usage',
+            '--disable-setuid-sandbox',
             '--disable-web-security',
-            '--disable-features=VizDisplayCompositor'
-        ]
+            '--disable-features=IsolateOrigins,site-per-process',
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--disable-background-timer-throttling',
+            '--disable-backgrounding-occluded-windows',
+            '--disable-renderer-backgrounding',
+            '--no-first-run',
+            '--no-default-browser-check',
+            '--disable-extensions',
+            // LinkedIn-specific arguments to avoid detection
+            '--disable-blink-features=AutomationControlled',
+            '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        ],
+        timeout: 60000,
+        protocolTimeout: 120000
     };
 
     // Only set executablePath if we found a specific browser
@@ -361,7 +492,20 @@ async function extractCompanyDataFromLinkedIn(linkedinUrl) {
 
     try {
         const cleanUrl = normalizeLinkedInUrl(linkedinUrl);
-        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36');
+        
+        // Additional stealth measures for LinkedIn
+        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+        
+        // Remove webdriver property
+        await page.evaluateOnNewDocument(() => {
+            Object.defineProperty(navigator, 'webdriver', {
+                get: () => undefined,
+            });
+        });
+        
+        // Set viewport to common resolution
+        await page.setViewport({ width: 1366, height: 768 });
+        
         await page.goto(cleanUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
         // await page?.waitForTimeout(4000);
 

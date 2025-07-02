@@ -3,7 +3,7 @@ services:
     name: sumnode-api
     env: node
     plan: free
-    buildCommand: npm install
+    buildCommand: npm install && npx puppeteer browsers install chrome
     startCommand: npm start
     envVars:
       - key: NODE_ENV
@@ -11,4 +11,4 @@ services:
       - key: PUPPETEER_SKIP_CHROMIUM_DOWNLOAD
         value: false
       - key: PUPPETEER_CACHE_DIR
-        value: /opt/render/.cache/puppeteer
+        value: /opt/render/project/src/.cache/puppeteer

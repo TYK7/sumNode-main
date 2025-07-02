@@ -11,7 +11,7 @@ async function ensureChrome() {
     console.log('🔧 [Chrome Installer] Checking Chrome availability...');
     
     try {
-        // Simply try to launch Puppeteer - it will handle Chrome installation automatically
+        // First attempt: Try to launch Puppeteer with existing Chrome
         const browser = await puppeteer.launch({
             headless: true,
             args: [
@@ -24,7 +24,7 @@ async function ensureChrome() {
                 '--single-process',
                 '--disable-gpu'
             ],
-            timeout: 60000 // Give time for potential download
+            timeout: 30000
         });
         
         const version = await browser.version();
@@ -35,8 +35,44 @@ async function ensureChrome() {
         return true;
         
     } catch (error) {
-        console.log('❌ [Chrome Installer] Chrome setup failed:', error.message);
-        return false;
+        console.log('❌ [Chrome Installer] First attempt failed:', error.message);
+        
+        // Second attempt: Try to install Chrome at runtime
+        console.log('🔄 [Chrome Installer] Attempting runtime Chrome installation...');
+        try {
+            const { execSync } = require('child_process');
+            execSync('npx puppeteer browsers install chrome', { 
+                stdio: 'inherit',
+                timeout: 120000 // 2 minutes timeout
+            });
+            
+            // Try launching again after installation
+            const browser = await puppeteer.launch({
+                headless: true,
+                args: [
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-accelerated-2d-canvas',
+                    '--no-first-run',
+                    '--no-zygote',
+                    '--single-process',
+                    '--disable-gpu'
+                ],
+                timeout: 30000
+            });
+            
+            const version = await browser.version();
+            console.log('✅ [Chrome Installer] Chrome installed and working:', version);
+            await browser.close();
+            
+            console.log('✅ Chrome is ready for web scraping');
+            return true;
+            
+        } catch (installError) {
+            console.log('❌ [Chrome Installer] Runtime installation failed:', installError.message);
+            return false;
+        }
     }
 }
 

@@ -690,7 +690,11 @@ async function extractCompanyDataFromLinkedIn(linkedinUrl) {
             }
         }
 
-        const data = await page.evaluate(() => {
+        // Add timeout to the page evaluation
+        console.log('[LinkedIn] Starting page data extraction...');
+        const data = await Promise.race([
+            page.evaluate(() => {
+            console.log('[LinkedIn Eval] Starting data extraction...');
             const getByLabel = (label) => {
                 const items = Array.from(document.querySelectorAll('dt'));
                 for (const dt of items) {
@@ -803,8 +807,12 @@ const getImageFromBanner = () => {
         }
     }
 
-            return {
-                bannerUrl: getImageFromBanner(),
+            console.log('[LinkedIn Eval] Extracting banner...');
+            const bannerUrl = getImageFromBanner();
+            console.log('[LinkedIn Eval] Banner extracted, getting company details...');
+            
+            const result = {
+                bannerUrl: bannerUrl,
                 description: description, // Use the potentially populated description variable
                 industry: getByLabel('Industry'),
                 companySize: getByLabel('Company size'),
@@ -815,8 +823,16 @@ const getImageFromBanner = () => {
                 specialties: getByLabel('Specialties'),
                 locations: getByLabel('Locations')
             };
-        });
-
+            
+            console.log('[LinkedIn Eval] Data extraction completed');
+            return result;
+        }),
+        new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('LinkedIn page evaluation timeout after 2 minutes')), 120000)
+        )
+    ]);
+        
+        console.log('[LinkedIn] Page evaluation completed successfully');
         await context.close();
         await browser.close();
         return data;
@@ -1570,11 +1586,11 @@ async function extractCompanyDetailsFromPage( page, url,browser) { // Added brow
                 // const linkedInData = await extractCompanyDataFromLinkedIn(cleanUrl,browser); //gpt-1
                 
                 // Add timeout wrapper for LinkedIn scraping
-                console.log('[LinkedIn] Starting LinkedIn data extraction with 3-minute timeout...');
+                console.log('[LinkedIn] Starting LinkedIn data extraction with 5-minute timeout...');
                 const linkedInData = await Promise.race([
                     extractCompanyDataFromLinkedIn(linkedInUrl),
                     new Promise((_, reject) => 
-                        setTimeout(() => reject(new Error('LinkedIn extraction timeout after 3 minutes')), 180000)
+                        setTimeout(() => reject(new Error('LinkedIn extraction timeout after 5 minutes')), 300000)
                     )
                 ]);
 

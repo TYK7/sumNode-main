@@ -281,11 +281,19 @@ async function setupPuppeteerPageForCompanyDetails(url) {
             '--disable-renderer-backgrounding',
             '--no-first-run',
             '--no-default-browser-check',
-            '--disable-extensions'
+            '--disable-extensions',
+            // Performance optimizations for Render
+            '--memory-pressure-off',
+            '--max_old_space_size=4096',
+            '--no-zygote',
+            '--single-process',
+            '--disable-background-networking',
+            '--disable-default-apps',
+            '--disable-sync'
         ],
         headless: true,
-        timeout: 60000, // Browser launch timeout
-        protocolTimeout: 120000 // CDP command timeout
+        timeout: 120000, // Browser launch timeout (2 minutes)
+        protocolTimeout: 300000 // CDP command timeout (5 minutes)
     };
 
     // Only set executablePath if we found a specific browser
@@ -293,7 +301,30 @@ async function setupPuppeteerPageForCompanyDetails(url) {
         launchOptions.executablePath = browserPath;
     }
     
-    const browser = await puppeteer.launch(launchOptions);
+    // Browser launch with retry logic
+    let browser;
+    let lastError;
+    
+    for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+            console.log(`[Browser] Launch attempt ${attempt}/3...`);
+            browser = await puppeteer.launch(launchOptions);
+            console.log(`[Browser] Launch successful on attempt ${attempt}`);
+            break;
+        } catch (error) {
+            lastError = error;
+            console.log(`[Browser] Launch attempt ${attempt} failed:`, error.message);
+            
+            if (attempt < 3) {
+                console.log(`[Browser] Waiting 3 seconds before retry...`);
+                await new Promise(resolve => setTimeout(resolve, 3000));
+            }
+        }
+    }
+    
+    if (!browser) {
+        throw new Error(`Browser launch failed after 3 attempts. Last error: ${lastError.message}`);
+    }
 
     try {
         const page = await browser.newPage();
@@ -470,8 +501,8 @@ async function extractCompanyDataFromLinkedIn(linkedinUrl) {
             '--disable-blink-features=AutomationControlled',
             '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36'
         ],
-        timeout: 90000,
-        protocolTimeout: 180000
+        timeout: 120000,
+        protocolTimeout: 300000
     };
 
     // Only set executablePath if we found a specific browser
@@ -549,8 +580,8 @@ async function extractCompanyDataFromLinkedIn(linkedinUrl) {
                 console.log(`[LinkedIn] Navigation attempt ${attempt} failed:`, error.message);
                 
                 if (attempt < 3) {
-                    console.log(`[LinkedIn] Waiting 5 seconds before retry...`);
-                    // await page.waitForTimeout(5000);
+                    console.log(`[LinkedIn] Waiting 3 seconds before retry...`);
+                    await new Promise(resolve => setTimeout(resolve, 3000));
                 }
             }
         }
@@ -560,8 +591,8 @@ async function extractCompanyDataFromLinkedIn(linkedinUrl) {
         }
         
         // Wait a bit for dynamic content to load with random delay
-        const randomDelay = 2000 + Math.random() * 3000; // 2-5 seconds
-        // await page.waitForTimeout(randomDelay);
+        const randomDelay = 1000 + Math.random() * 2000; // 1-3 seconds
+        await new Promise(resolve => setTimeout(resolve, randomDelay));
 
         // Try to close various popups that might appear
         const popupSelectors = [
@@ -576,7 +607,7 @@ async function extractCompanyDataFromLinkedIn(linkedinUrl) {
             try {
                 await page.click(selector, { timeout: 2000 });
                 console.log(`[LinkedIn] Dismissed popup using selector: ${selector}`);
-                // await page.waitForTimeout(1000); // Wait after dismissing
+                await new Promise(resolve => setTimeout(resolve, 1000)); // Wait after dismissing
                 break;
             } catch {
                 // Continue to next selector
@@ -1550,7 +1581,17 @@ app.post('/api/extract-company-details', async (req, res) => {
         res.status(statusCode).json({ error: errorMessage, details: error.message });
     } finally {
         if (browser) {
-            await browser.close(); // Ensure browser is closed
+            try {
+                await browser.close(); // Ensure browser is closed
+                console.log('[Browser] Browser closed successfully');
+            } catch (closeError) {
+                console.error('[Browser] Error closing browser:', closeError.message);
+            }
+        }
+        
+        // Force garbage collection if available
+        if (global.gc) {
+            global.gc();
         }
     }
 });

@@ -315,9 +315,61 @@ function getBrowserExecutablePath() {
     const isProduction = process.env.NODE_ENV === 'production' || process.env.RENDER;
     
     if (isProduction) {
-        // For production environments (Render), use Puppeteer's bundled Chromium
-        console.log('[Browser] Production environment detected, using Puppeteer bundled Chromium');
-        return null; // Let Puppeteer use its bundled Chromium
+        // For production environments (Render), try to find installed Chrome
+        console.log('[Browser] Production environment detected');
+        
+        // Check for Chrome installed via npx puppeteer browsers install chrome
+        const puppeteerCacheDir = process.env.PUPPETEER_CACHE_DIR || '/opt/render/project/.cache/puppeteer';
+        
+        try {
+            // Look for Chrome in various possible locations
+            const possiblePaths = [
+                // Puppeteer cache directory
+                path.join(puppeteerCacheDir, 'chrome'),
+                // Alternative cache locations
+                '/opt/render/project/node_modules/puppeteer/.local-chromium',
+                '/opt/render/project/.cache/puppeteer/chrome',
+                // System Chrome (unlikely but worth checking)
+                '/usr/bin/google-chrome-stable',
+                '/usr/bin/google-chrome'
+            ];
+            
+            for (const basePath of possiblePaths) {
+                if (fs.existsSync(basePath)) {
+                    if (basePath.includes('chrome') && !basePath.endsWith('chrome')) {
+                        // This is a directory, look for the executable inside
+                        try {
+                            const dirs = fs.readdirSync(basePath);
+                            for (const dir of dirs) {
+                                const chromePath = path.join(basePath, dir, 'chrome-linux64', 'chrome');
+                                if (fs.existsSync(chromePath)) {
+                                    console.log(`[Browser] Found Chrome: ${chromePath}`);
+                                    return chromePath;
+                                }
+                                // Alternative path structure
+                                const altChromePath = path.join(basePath, dir, 'chrome');
+                                if (fs.existsSync(altChromePath)) {
+                                    console.log(`[Browser] Found Chrome: ${altChromePath}`);
+                                    return altChromePath;
+                                }
+                            }
+                        } catch (error) {
+                            console.log(`[Browser] Error reading directory ${basePath}:`, error.message);
+                        }
+                    } else if (basePath.endsWith('google-chrome-stable') || basePath.endsWith('google-chrome')) {
+                        // Direct executable path
+                        console.log(`[Browser] Found system Chrome: ${basePath}`);
+                        return basePath;
+                    }
+                }
+            }
+        } catch (error) {
+            console.log('[Browser] Error searching for Chrome:', error.message);
+        }
+        
+        // Last resort: use Puppeteer's bundled Chromium
+        console.log('[Browser] No Chrome found, using Puppeteer bundled Chromium');
+        return null;
     }
     
     // For local development, try to find installed browsers
@@ -371,9 +423,9 @@ function getBrowserExecutablePathForLinkedIn() {
     const isProduction = process.env.NODE_ENV === 'production' || process.env.RENDER;
     
     if (isProduction) {
-        // In production (Render), use Puppeteer's bundled Chromium for LinkedIn
-        console.log('[LinkedIn Browser] Production environment detected, using Puppeteer bundled Chromium for LinkedIn');
-        return null; // Let Puppeteer use its bundled Chromium
+        // In production (Render), use the same Chrome detection as general extraction
+        console.log('[LinkedIn Browser] Production environment detected, using same Chrome detection');
+        return getBrowserExecutablePath();
     }
     
     // For local development, prefer Edge for LinkedIn

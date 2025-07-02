@@ -13,45 +13,34 @@ try {
     const puppeteer = require('puppeteer');
     console.log('✅ Puppeteer package loaded successfully');
     
-    // Check cache directories
-    const cacheDir = process.env.PUPPETEER_CACHE_DIR || '/opt/render/project/.cache/puppeteer';
-    console.log(`📁 Checking cache directory: ${cacheDir}`);
+    // Check if Puppeteer will download Chromium automatically
+    console.log('🔧 Environment variables:');
+    console.log('   PUPPETEER_SKIP_CHROMIUM_DOWNLOAD:', process.env.PUPPETEER_SKIP_CHROMIUM_DOWNLOAD);
+    console.log('   PUPPETEER_CACHE_DIR:', process.env.PUPPETEER_CACHE_DIR);
+    console.log('   NODE_ENV:', process.env.NODE_ENV);
     
-    if (fs.existsSync(cacheDir)) {
-        console.log('✅ Cache directory exists');
-        
-        // List contents
-        try {
-            const contents = fs.readdirSync(cacheDir);
-            console.log('📋 Cache directory contents:', contents);
-            
-            // Check for chrome directory
-            const chromeDir = path.join(cacheDir, 'chrome');
-            if (fs.existsSync(chromeDir)) {
-                console.log('✅ Chrome directory found');
-                const chromeContents = fs.readdirSync(chromeDir);
-                console.log('📋 Chrome directory contents:', chromeContents);
-                
-                // Look for executables
-                for (const item of chromeContents) {
-                    const itemPath = path.join(chromeDir, item);
-                    if (fs.statSync(itemPath).isDirectory()) {
-                        const execPath = path.join(itemPath, 'chrome-linux64', 'chrome');
-                        if (fs.existsSync(execPath)) {
-                            console.log(`✅ Found Chrome executable: ${execPath}`);
-                        } else {
-                            console.log(`❌ Chrome executable not found at: ${execPath}`);
-                        }
-                    }
-                }
-            } else {
-                console.log('❌ Chrome directory not found');
+    // Check various possible cache directories
+    const possibleCacheDirs = [
+        process.env.PUPPETEER_CACHE_DIR,
+        '/opt/render/project/.cache/puppeteer',
+        '/opt/render/project/node_modules/puppeteer/.local-chromium',
+        path.join(__dirname, 'node_modules', 'puppeteer', '.local-chromium')
+    ].filter(Boolean);
+    
+    console.log('📁 Checking possible cache directories...');
+    for (const cacheDir of possibleCacheDirs) {
+        console.log(`   Checking: ${cacheDir}`);
+        if (fs.existsSync(cacheDir)) {
+            console.log(`   ✅ Directory exists`);
+            try {
+                const contents = fs.readdirSync(cacheDir);
+                console.log(`   📋 Contents: ${contents.join(', ')}`);
+            } catch (error) {
+                console.log(`   ❌ Error reading: ${error.message}`);
             }
-        } catch (error) {
-            console.log('❌ Error reading cache directory:', error.message);
+        } else {
+            console.log(`   ❌ Directory does not exist`);
         }
-    } else {
-        console.log('❌ Cache directory does not exist');
     }
     
     // Try to launch Puppeteer

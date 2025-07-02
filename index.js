@@ -540,7 +540,7 @@ async function extractCompanyDataFromLinkedIn(linkedinUrl) {
                 
                 if (attempt < 3) {
                     console.log(`[LinkedIn] Waiting 5 seconds before retry...`);
-                    await page.waitForTimeout(5000);
+                    // await page.waitForTimeout(5000);
                 }
             }
         }
@@ -551,7 +551,7 @@ async function extractCompanyDataFromLinkedIn(linkedinUrl) {
         
         // Wait a bit for dynamic content to load with random delay
         const randomDelay = 2000 + Math.random() * 3000; // 2-5 seconds
-        await page.waitForTimeout(randomDelay);
+        // await page.waitForTimeout(randomDelay);
 
         // Try to close various popups that might appear
         const popupSelectors = [
@@ -566,7 +566,7 @@ async function extractCompanyDataFromLinkedIn(linkedinUrl) {
             try {
                 await page.click(selector, { timeout: 2000 });
                 console.log(`[LinkedIn] Dismissed popup using selector: ${selector}`);
-                await page.waitForTimeout(1000); // Wait after dismissing
+                // await page.waitForTimeout(1000); // Wait after dismissing
                 break;
             } catch {
                 // Continue to next selector
